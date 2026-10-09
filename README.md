@@ -41,7 +41,6 @@ Wait for each job to finish (check with `squeue -u $USER`, and the log files in 
 - **Steps 13 to 15 share one batch script.** `run_script.sh` holds the commands for all three steps.
   Uncomment one `python` line at a time, in this order, and submit once for each:
   1. Step 13: `python src/model_training/join_clusters.py --out-name training_data.csv`
-     (by default it writes `training_data_pam.csv`, but Steps 14 and 15 read `training_data.csv`).
   2. Step 14: `python src/hf_prevalance.py --data batch_outputs/model_training/training_data.csv --out batch_outputs/model_training/hf_prevalence_by_cluster.csv`
      (`--out` must be a file name, not a folder).
   3. Step 15: the `train_xgb_metrics.py` line, which is already uncommented.
