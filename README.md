@@ -1,13 +1,5 @@
 # Hypertension Patient Clustering Pipeline
 
-## How to reproduce the results (start here)
-
-The project has many scripts, but only **one script per step** is needed to get the final results.
-Run the steps below **in order**. Each step reads the files written by the step before it, so do not skip ahead.
-Every step is started with one `sbatch` command (a job submitted to the Amarel Slurm cluster).
-
-### Before you start (Step 0)
-
 1. **Environment:** a conda environment named `hyperten` with `pandas`, `numpy`, `pyarrow`, `scikit-learn`,
    `scanpy`, `leidenalg`, `umap-learn`, `xgboost` and `matplotlib`.
 2. **Raw input files**, placed in `/projects/f_miarc_1/Hypertension/`:
@@ -22,37 +14,31 @@ Every step is started with one `sbatch` command (a job submitted to the Amarel S
 
 ### The steps
 
-| Step | What it does (in plain words) | Command | Main output (in `batch_outputs/`) |
+| Step | What it does | Command | Output (in `batch_outputs/`) |
 |---|---|---|---|
 | **1** | Count diagnosis codes per patient | `sbatch batch_scripts/run_script_diagnoses.sh` | `icd10_3digit_patient_frequencies.csv` |
 | **2** | Flag each patient's comorbidities (needs Step 1) | `sbatch batch_scripts/run_script_comorb.sh` | `patient_comorbidity_flags.csv` |
 | **3** | Group each patient's medications | `sbatch batch_scripts/run_script_meds.sh` | `patient_med_groups_new.csv` (see note A) |
-| **4** | Clean lab results | `sbatch batch_scripts/run_script_labs.sh` | `labs_by_patient.csv` |
-| **5** | Clean vital signs | `sbatch batch_scripts/run_script_vitals.sh` | `vitals_by_patient.csv` |
+| **4** | lab results | `sbatch batch_scripts/run_script_labs.sh` | `labs_by_patient.csv` |
+| **5** | vital signs | `sbatch batch_scripts/run_script_vitals.sh` | `vitals_by_patient.csv` |
 | **6** | Keep only labs taken within 15 days of the hypertension diagnosis | `sbatch batch_scripts/run_script_labsxdiag.sh` | `lab_within_15_days_of_diagnosis.csv` |
 | **7** | Keep only vitals taken within 15 days of the hypertension diagnosis | `sbatch batch_scripts/run_script_vitalsxdiag.sh` | `vitals_within_15_days_of_diagnosis.csv` |
 | **8** | Convert lab units, one row per patient, fill missing values with the median | `sbatch batch_scripts/run_script_labs_filter.sh` | `filtered_labs/patient_lab_values_wide_median_imputed.csv` |
 | **9** | Same as Step 8, for vitals | `sbatch batch_scripts/run_script_vitals_filter.sh` | `filtered_vitals/patient_vital_values_wide_median_imputed.csv` |
 | **10** | Merge everything into one table (one row per patient) | `sbatch batch_scripts/run_script_master.sh` | `master_file/master.csv` |
-| **11** | Prepare the merged table for clustering (scaling, encoding) | `sbatch batch_scripts/run_script_features_cluster.sh` | `master_file/master_clustering_ready.csv` |
-| **12** | Group patients into clusters (Leiden, see note B) | `sbatch batch_scripts/run_script_experiements.sh` | `clustering_median_strdzn/phenograph/scanpy_leiden_k30_res0p4_cosine/patient_clusters.csv` |
-| **13** | Attach each patient's cluster to their features (see note C) | `sbatch batch_scripts/run_script.sh` | `model_training/training_data.csv` |
-| **14** | Heart-failure rate in each cluster (see note C) | `sbatch batch_scripts/run_script.sh` | `model_training/hf_prevalence_by_cluster.csv` |
+| **11** | Prepare the merged table for clustering  | `sbatch batch_scripts/run_script_features_cluster.sh` | `master_file/master_clustering_ready.csv` |
+| **12** | Group patients into clusters  | `sbatch batch_scripts/run_script_experiements.sh` | `clustering_median_strdzn/phenograph/scanpy_leiden_k30_res0p4_cosine/patient_clusters.csv` |
+| **13** | Attach each patient's cluster to their features | `sbatch batch_scripts/run_script.sh` | `model_training/training_data.csv` |
+| **14** | Heart-failure rate in each cluster  | `sbatch batch_scripts/run_script.sh` | `model_training/hf_prevalence_by_cluster.csv` |
 | **15** | Train XGBoost to predict the cluster, and report accuracy and important features | `sbatch batch_scripts/run_script.sh` | `model_training/confusion_matrix.csv`, `per_class_auc.csv`, `feature_importance.csv` |
 
 Steps 1 to 5 do not depend on each other except that **Step 2 needs Step 1**, so Steps 1, 3, 4 and 5 can be submitted together.
 Wait for each job to finish (check with `squeue -u $USER`, and the log files in `logs/`) before starting a step that needs its output.
 
-### Notes (please read before running)
+### Notes 
 
-- **A. Medication file name.** `meds.py` writes `patient_med_groups_new.csv`, but Step 10 reads
-  `patient_med_groups.csv`. After Step 3, rename the file:
-  `mv batch_outputs/patient_med_groups_new.csv batch_outputs/patient_med_groups.csv`
-- **B. Step 12 runs the final clustering method.** `run_script_experiements.sh` holds one line per clustering
-  method that was tried. To reproduce the reported clusters, make the `run_leiden_with_metrics.py` line
-  (`--method scanpy_leiden --n-pcs 19 --n-neighbors 30 --resolution 0.4 --metric cosine ...`) the only
-  uncommented `python` line, and comment out the `run_affinity_propagation.py` line.
-- **C. Steps 13 to 15 share one batch script.** `run_script.sh` holds the commands for all three steps.
+
+- **Steps 13 to 15 share one batch script.** `run_script.sh` holds the commands for all three steps.
   Uncomment one `python` line at a time, in this order, and submit once for each:
   1. Step 13: `python src/model_training/join_clusters.py --out-name training_data.csv`
      (by default it writes `training_data_pam.csv`, but Steps 14 and 15 read `training_data.csv`).
